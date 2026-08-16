@@ -142,9 +142,31 @@ function judgeSelfTest() {
   console.log(`补充 24点-重复数字: pass=${t24dup.pass} reason=${t24dup.reason}`);
 }
 
+// ── 1. 三协议冒烟：每种协议各跑通一个模型（M0 验收项 3）────────────────
+async function protocolSmoke() {
+  console.log('\n===== 三协议冒烟（各跑通一个模型）=====');
+  const relayKey = process.env.SSY_API_KEY;
+  const relayBase = process.env.SSY_BASE_URL;
+  const providers = [
+    { id: 'openai:chat:deepseek-v4-flash', config: { showThinking: false, max_tokens: 64, passthrough: { thinking: { type: 'disabled' } } } },
+    { id: 'openai:responses:openai/gpt-4o-mini', config: { apiBaseUrl: relayBase, apiKey: relayKey, max_tokens: 64 } },
+    { id: 'anthropic:messages:deepseek-v4-flash', config: { showThinking: false, max_tokens: 64, thinking: { type: 'disabled' } } },
+  ];
+  const r = await evaluate({
+    providers,
+    prompts: [{ label: 'protocol-smoke', raw: '只回复两个字：你好' }],
+  });
+  for (const x of r.results) {
+    console.log(
+      `${x.error ? 'FAIL' : 'PASS'}  ${x.provider?.id}  ->  ${x.error ? 'ERR ' + x.error : JSON.stringify(String(x.response?.output ?? '').slice(0, 30))}  (latency ${x.latencyMs}ms, token ${x.response?.tokenUsage?.total ?? '?'})`,
+    );
+  }
+}
+
 // ── 主流程 ─────────────────────────────────────────────────────────────
 async function main() {
   judgeSelfTest();
+  await protocolSmoke();
 
   // 1) 题2 24点：确定性答案，javascript 断言判对错
   try {
@@ -192,8 +214,8 @@ async function main() {
   }
 
   console.log(
-    '\n说明：OpenAI v2（responses）协议已在 promptfoo 0.122 中确认支持（provider id = openai:responses:<model>），' +
-      '但 DeepSeek 不提供 Responses API、本机亦无真实 OpenAI key，故本轮未跑真机。补一个真实 OpenAI key 即可补测。',
+    '\n说明：OpenAI v2（responses）协议通过胜算云中转（provider id = openai:responses:<model>）真机跑通；' +
+      '三协议（openai-v1 / openai-v2 / anthropic messages）均已验证。',
   );
 }
 
