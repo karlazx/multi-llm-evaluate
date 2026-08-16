@@ -113,7 +113,7 @@ export default function EvalsPage() {
                   <td>{o.model_display ?? o.model_name}</td>
                   <td>{o.latency_ms ?? '-'}ms</td>
                   <td>{o.token_in ?? '-'} / {o.token_out ?? '-'}</td>
-                  <td>{o.cost_usd != null ? `$${o.cost_usd.toFixed(6)}` : '—'}</td>
+                  <td>{o.cost_usd != null ? `$${Number(o.cost_usd).toFixed(6)}` : '—'}</td>
                   <td className="preview">{o.raw_output ? o.raw_output.slice(0, 80) : '（无输出）'}</td>
                 </tr>
               ))}
