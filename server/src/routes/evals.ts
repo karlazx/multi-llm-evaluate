@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { query } from '../db.js';
 import { runEval } from '../services/evalRunner.js';
-import { buildReport } from '../services/report.js';
+import { aggregateReport, buildReport, reportToMarkdown } from '../services/report.js';
 
 export async function evalRoutes(app: FastifyInstance) {
   app.get('/api/evals', async () => {
@@ -59,5 +59,21 @@ export async function evalRoutes(app: FastifyInstance) {
   app.get('/api/evals/:id/report', async (req) => {
     const { id } = req.params as { id: string };
     return buildReport(Number(id));
+  });
+
+  // 报告导出 Markdown（Content-Type: text/markdown，可直接下载）
+  app.get('/api/evals/:id/export', async (req, reply) => {
+    const { id } = req.params as { id: string };
+    const md = reportToMarkdown(await buildReport(Number(id)));
+    reply.type('text/markdown; charset=utf-8');
+    return md;
+  });
+
+  // 跨轮次对比（增量评测：新模型跑完并入历史轮次一起看）
+  app.get('/api/evals/compare', async (req) => {
+    const { run_ids } = req.query as { run_ids?: string };
+    const ids = (run_ids ?? '').split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n) && n > 0);
+    if (!ids.length) return app.httpErrors.badRequest('run_ids 必填（逗号分隔）');
+    return aggregateReport(ids);
   });
 }

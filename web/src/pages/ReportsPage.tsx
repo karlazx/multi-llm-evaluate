@@ -5,6 +5,7 @@ export default function ReportsPage() {
   const [runs, setRuns] = useState<EvalRun[]>([]);
   const [selected, setSelected] = useState<number | null>(null);
   const [report, setReport] = useState<Report | null>(null);
+  const [compareIds, setCompareIds] = useState<number[]>([]);
   const [error, setError] = useState('');
 
   async function loadRuns() {
@@ -15,9 +16,28 @@ export default function ReportsPage() {
   async function open(id: number) {
     setSelected(id);
     setError('');
-    try {
-      setReport(await api.evals.report(id));
-    } catch (e) { setError((e as Error).message); }
+    try { setReport(await api.evals.report(id)); } catch (e) { setError((e as Error).message); }
+  }
+
+  async function exportMd() {
+    if (!selected) return;
+    const md = await api.evals.exportMd(selected);
+    const blob = new Blob([md], { type: 'text/markdown' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `report-run-${selected}.md`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function toggleCompare(id: number) {
+    setCompareIds((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
+  }
+
+  async function compare() {
+    if (compareIds.length < 2) { setError('至少选 2 个轮次对比'); return; }
+    setError('');
+    try { setReport(await api.evals.compare(compareIds)); } catch (e) { setError((e as Error).message); }
   }
 
   const modelNames = report ? Array.from(new Set(report.ranking.map((r) => r.model_name))) : [];
@@ -35,12 +55,27 @@ export default function ReportsPage() {
             {runs.map((r) => <option key={r.id} value={r.id}>#{r.id} {r.name}（{r.status}）</option>)}
           </select>
         </label>
+        {selected && (
+          <div className="row">
+            <button className="btn" onClick={exportMd}>导出 Markdown</button>
+          </div>
+        )}
+        <h4>增量评测：跨轮次对比（勾选多个轮次）</h4>
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          {runs.map((r) => (
+            <label key={r.id} className="check">
+              <input type="checkbox" checked={compareIds.includes(r.id)} onChange={() => toggleCompare(r.id)} />
+              #{r.id} {r.name}
+            </label>
+          ))}
+          <button className="btn primary" onClick={compare}>对比（{compareIds.length}）</button>
+        </div>
       </div>
 
       {report && (
         <>
           <div className="panel">
-            <h3>① 总分排行</h3>
+            <h3>① 总分排行{report.run_ids.length > 1 ? `（轮次 ${report.run_ids.join(', ')}）` : ''}</h3>
             <table className="table">
               <thead><tr><th>名次</th><th>模型</th><th>平均分（0-100）</th></tr></thead>
               <tbody>

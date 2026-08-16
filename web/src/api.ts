@@ -42,6 +42,7 @@ export interface EvalRun {
 
 export interface Report {
   run_id: number;
+  run_ids: number[];
   generated_at: string;
   ranking: Array<{ model_id: number; model_name: string; avg_score: number | null }>;
   dimensions: Array<{ dimension: string; model_id: number; model_name: string; avg_score: number | null }>;
@@ -122,6 +123,8 @@ export const api = {
     create: (b: { name?: string; case_ids: number[]; model_ids: number[] }) => req<EvalRun>('/api/evals', { method: 'POST', body: JSON.stringify(b) }),
     outputs: (id: number) => req<RunOutput[]>(`/api/evals/${id}/outputs`),
     report: (id: number) => req<Report>(`/api/evals/${id}/report`),
+    exportMd: async (id: number) => (await fetch(`/api/evals/${id}/export`)).text(),
+    compare: (ids: number[]) => req<Report>(`/api/evals/compare?run_ids=${ids.join(',')}`),
   },
   blind: {
     outputs: (runId: number) =>
