@@ -19,6 +19,7 @@ export default function ModelsPage() {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<ModelRow | null>(null);
   const [form, setForm] = useState(empty);
+  const [showForm, setShowForm] = useState(false);
   const [testing, setTesting] = useState<number | null>(null);
 
   async function load() {
@@ -26,7 +27,7 @@ export default function ModelsPage() {
   }
   useEffect(() => { void load(); }, []);
 
-  function openCreate() { setEditing(null); setForm(empty); }
+  function openCreate() { setEditing(null); setForm(empty); setShowForm(true); }
   function openEdit(m: ModelRow) {
     setEditing(m);
     setForm({
@@ -34,7 +35,9 @@ export default function ModelsPage() {
       endpoint: m.endpoint ?? '', api_key: '', cost_input: m.cost_input?.toString() ?? '',
       cost_output: m.cost_output?.toString() ?? '', thinking: m.thinking,
     });
+    setShowForm(true);
   }
+  function closeForm() { setEditing(null); setForm(empty); setShowForm(false); }
   async function save() {
     if (!form.name || !form.endpoint) { setError('模型名和 endpoint 必填'); return; }
     try {
@@ -47,7 +50,8 @@ export default function ModelsPage() {
       if (form.api_key) body.api_key = form.api_key; // 为空则不更新 key
       if (editing) await api.models.update(editing.id, body);
       else await api.models.create(body);
-      setEditing(null); setForm(empty); await load();
+      closeForm();
+      await load();
     } catch (e) { setError((e as Error).message); }
   }
   async function test(id: number) {
@@ -72,7 +76,7 @@ export default function ModelsPage() {
       </div>
       {error && <div className="alert">{error}</div>}
 
-      {(editing || form.name === '') && (
+      {showForm && (
         <div className="panel">
           <h3>{editing ? `编辑 #${editing.id}（key 留空则不更新）` : '接入模型'}</h3>
           <div className="form-grid">
@@ -96,7 +100,7 @@ export default function ModelsPage() {
           </div>
           <div className="row">
             <button className="btn primary" onClick={save}>保存</button>
-            <button className="btn" onClick={() => { setEditing(null); setForm(empty); }}>取消</button>
+            <button className="btn" onClick={closeForm}>取消</button>
           </div>
         </div>
       )}

@@ -12,6 +12,7 @@ export default function CasesPage() {
   const [error, setError] = useState('');
   const [editing, setEditing] = useState<CaseRow | null>(null);
   const [form, setForm] = useState<typeof empty>(empty);
+  const [showForm, setShowForm] = useState(false);
 
   async function load() {
     try {
@@ -27,6 +28,7 @@ export default function CasesPage() {
   function openCreate() {
     setEditing(null);
     setForm(empty);
+    setShowForm(true);
   }
   function openEdit(c: CaseRow) {
     setEditing(c);
@@ -34,14 +36,19 @@ export default function CasesPage() {
       title: c.title, prompt: c.prompt, dimension: c.dimension ?? '', type: c.type,
       expected_answer: c.expected_answer ?? '', rubric: c.rubric ?? '',
     });
+    setShowForm(true);
+  }
+  function closeForm() {
+    setEditing(null);
+    setForm(empty);
+    setShowForm(false);
   }
   async function save() {
     if (!form.title || !form.prompt) { setError('标题和 prompt 必填'); return; }
     try {
       if (editing) await api.cases.update(editing.id, form);
       else await api.cases.create(form);
-      setEditing(null);
-      setForm(empty);
+      closeForm();
       await load();
     } catch (e) { setError((e as Error).message); }
   }
@@ -60,7 +67,7 @@ export default function CasesPage() {
       </div>
       {error && <div className="alert">{error}</div>}
 
-      {(editing || (!editing && form.title === '')) && (
+      {showForm && (
         <div className="panel">
           <h3>{editing ? `编辑 #${editing.id}` : '新建用例'}</h3>
           <div className="form-grid">
@@ -82,7 +89,7 @@ export default function CasesPage() {
           </div>
           <div className="row">
             <button className="btn primary" onClick={save}>保存</button>
-            <button className="btn" onClick={() => { setEditing(null); setForm(empty); }}>取消</button>
+            <button className="btn" onClick={closeForm}>取消</button>
           </div>
         </div>
       )}
