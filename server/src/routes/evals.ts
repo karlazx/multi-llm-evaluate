@@ -1,6 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { query } from '../db.js';
 import { runEval } from '../services/evalRunner.js';
+import { buildReport } from '../services/report.js';
 
 export async function evalRoutes(app: FastifyInstance) {
   app.get('/api/evals', async () => {
@@ -52,5 +53,11 @@ export async function evalRoutes(app: FastifyInstance) {
       [id],
     );
     return rows;
+  });
+
+  // 报告：总分排行 + 分维度 + 成本看板 + 单用例穿透（按轮次归档）
+  app.get('/api/evals/:id/report', async (req) => {
+    const { id } = req.params as { id: string };
+    return buildReport(Number(id));
   });
 }

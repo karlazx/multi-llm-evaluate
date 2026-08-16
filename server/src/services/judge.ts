@@ -141,12 +141,15 @@ export function judgeSentence(output: string): GradingResult {
   return { pass: true, score: 1, reason: '10 句结构合规：结尾一到十、倒数第二字不重复且不含第/是/为' };
 }
 
-/** 按 case.type 选择对应 L1 判分器；未知类型返回 null（走 AI 裁判） */
-export function judgeForCase(type: string, output: string): GradingResult | null {
-  switch (type) {
-    case 'objective':
-      // objective 用例按 title 关键字再细分（题1/2/3）
-      return null; // 由调用方按 case 的 assertion 脚本或已知规则选判分器
+/** 按 case.assertion_script 名称返回对应 L1 判分器；未知返回 null（走 AI 裁判） */
+export function l1JudgeByName(name: string | null): ((output: string) => GradingResult) | null {
+  switch (name) {
+    case 'judgeSentence':
+      return judgeSentence;
+    case 'judge24Point':
+      return judge24Point;
+    case 'judgePasswordLock':
+      return judgePasswordLock;
     default:
       return null;
   }

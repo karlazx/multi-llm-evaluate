@@ -17,17 +17,21 @@ export interface ModelRow {
 }
 
 /** 把一个 DB 模型行 → promptfoo provider（含 key 解密、thinking、透传参数） */
-export function buildProvider(model: ModelRow): { id: string; config: Record<string, unknown> } {
+export function buildProvider(
+  model: ModelRow,
+  opts: { maxTokens?: number } = {},
+): { id: string; config: Record<string, unknown> } {
   const apiKey = model.api_key_enc ? decrypt(model.api_key_enc) : '';
   const thinking = model.thinking || 'disabled';
   const thinkingStruct = { type: thinking };
   const extra = model.default_params ?? {};
+  const maxTokens = opts.maxTokens ?? 8192;
 
   const base = {
     apiKey,
     apiBaseUrl: model.endpoint ?? '',
-    max_tokens: 8192,
-    maxTokens: 8192,
+    max_tokens: maxTokens,
+    maxTokens,
     showThinking: false, // 判分只取作答，不含思考
     ...extra,
   };

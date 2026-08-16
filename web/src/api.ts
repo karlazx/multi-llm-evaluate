@@ -40,6 +40,25 @@ export interface EvalRun {
   finished_at: string | null;
 }
 
+export interface Report {
+  run_id: number;
+  generated_at: string;
+  ranking: Array<{ model_id: number; model_name: string; avg_score: number | null }>;
+  dimensions: Array<{ dimension: string; model_id: number; model_name: string; avg_score: number | null }>;
+  costs: Array<{ model_id: number; model_name: string; total_cost_usd: number | null; total_tokens: number | null; avg_latency_ms: number | null }>;
+  details: Array<{
+    case_id: number;
+    case_title: string;
+    dimension: string | null;
+    model_id: number;
+    model_name: string;
+    score: number | null;
+    reason: string | null;
+    raw_output: string | null;
+    latency_ms: number | null;
+  }>;
+}
+
 export interface RunOutput {
   id: number;
   run_id: number;
@@ -86,5 +105,6 @@ export const api = {
     get: (id: number) => req<EvalRun>(`/api/evals/${id}`),
     create: (b: { name?: string; case_ids: number[]; model_ids: number[] }) => req<EvalRun>('/api/evals', { method: 'POST', body: JSON.stringify(b) }),
     outputs: (id: number) => req<RunOutput[]>(`/api/evals/${id}/outputs`),
+    report: (id: number) => req<Report>(`/api/evals/${id}/report`),
   },
 };

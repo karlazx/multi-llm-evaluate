@@ -2,13 +2,15 @@ import { useState } from 'react';
 import CasesPage from './pages/CasesPage';
 import ModelsPage from './pages/ModelsPage';
 import EvalsPage from './pages/EvalsPage';
+import ReportsPage from './pages/ReportsPage';
 
-type Tab = 'cases' | 'models' | 'evals';
+type Tab = 'cases' | 'models' | 'evals' | 'reports';
 
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: 'cases', label: '用例库' },
   { key: 'models', label: '模型接入' },
   { key: 'evals', label: '发起评测' },
+  { key: 'reports', label: '报告' },
 ];
 
 export default function App() {
@@ -34,6 +36,7 @@ export default function App() {
         {tab === 'cases' && <CasesPage />}
         {tab === 'models' && <ModelsPage />}
         {tab === 'evals' && <EvalsPage />}
+        {tab === 'reports' && <ReportsPage />}
       </main>
     </div>
   );
