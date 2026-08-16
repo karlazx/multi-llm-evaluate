@@ -8,7 +8,11 @@
     "m0": "tsx m0/demo.ts",
     "seed": "tsx server/src/seed.ts",
     "server": "tsx server/src/index.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "web:dev": "vite",
+    "web:build": "vite build",
+    "web:preview": "vite preview",
+    "web:typecheck": "tsc --noEmit -p web/tsconfig.json"
   },
   "dependencies": {
     "@fastify/cors": "^11.3.0",
@@ -18,10 +22,16 @@
     "mathjs": "^15.2.0",
     "pg": "^8.23.0",
     "promptfoo": "^0.122.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
     "tsx": "^4.23.12",
     "typescript": "^7.0.2"
   },
   "devDependencies": {
-    "@types/pg": "^8.21.0"
+    "@types/pg": "^8.21.0",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.4",
+    "@vitejs/plugin-react": "^6.0.5",
+    "vite": "^8.2.1"
   }
 }
