@@ -1,0 +1,15 @@
+# deps
+node_modules/
+
+# secrets — never commit real keys
+.env
+.env.*
+!.env.example
+
+# local data snapshots
+data/
+dist/
+
+# logs / OS noise
+*.log
+.DS_Store

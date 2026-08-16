@@ -1,0 +1,17 @@
+{
+  "name": "multi-llm-evaluate",
+  "version": "0.1.0",
+  "description": "用例驱动 + 多协议 API 跑测 + 三级评估（自动判分/AI 裁判/人工盲评）+ 报告导出 的私有大模型选型评测平台",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "m0": "tsx m0/demo.ts"
+  },
+  "dependencies": {
+    "@types/node": "^26.2.0",
+    "mathjs": "^15.2.0",
+    "promptfoo": "^0.122.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  }
+}
