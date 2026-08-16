@@ -92,9 +92,13 @@ export interface RunOutput {
 }
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
+  const hasBody = init?.body !== undefined && init?.body !== null;
   const res = await fetch(url, {
-    headers: { 'content-type': 'application/json' },
     ...init,
+    headers: {
+      ...(hasBody ? { 'content-type': 'application/json' } : {}),
+      ...(init?.headers as Record<string, string> | undefined),
+    },
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');
