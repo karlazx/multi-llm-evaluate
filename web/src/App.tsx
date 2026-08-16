@@ -3,14 +3,16 @@ import CasesPage from './pages/CasesPage';
 import ModelsPage from './pages/ModelsPage';
 import EvalsPage from './pages/EvalsPage';
 import ReportsPage from './pages/ReportsPage';
+import BlindPage from './pages/BlindPage';
 
-type Tab = 'cases' | 'models' | 'evals' | 'reports';
+type Tab = 'cases' | 'models' | 'evals' | 'reports' | 'blind';
 
 const TABS: Array<{ key: Tab; label: string }> = [
   { key: 'cases', label: '用例库' },
   { key: 'models', label: '模型接入' },
   { key: 'evals', label: '发起评测' },
   { key: 'reports', label: '报告' },
+  { key: 'blind', label: '人工盲评' },
 ];
 
 export default function App() {
@@ -37,6 +39,7 @@ export default function App() {
         {tab === 'models' && <ModelsPage />}
         {tab === 'evals' && <EvalsPage />}
         {tab === 'reports' && <ReportsPage />}
+        {tab === 'blind' && <BlindPage />}
       </main>
     </div>
   );

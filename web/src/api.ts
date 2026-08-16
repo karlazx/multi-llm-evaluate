@@ -59,6 +59,22 @@ export interface Report {
   }>;
 }
 
+export interface BlindOutput {
+  case_id: number;
+  model_id: number;
+  raw_output: string | null;
+  case_title: string;
+  case_type: string;
+}
+export interface EloRow { model_id: number; model_name: string; elo: number; votes: number; }
+export interface Calibration {
+  agreement: number | null;
+  comparable: number;
+  total_votes: number;
+  ai_avg: Array<{ id: number; name: string; ai_score: number }>;
+  elo: EloRow[];
+}
+
 export interface RunOutput {
   id: number;
   run_id: number;
@@ -106,5 +122,13 @@ export const api = {
     create: (b: { name?: string; case_ids: number[]; model_ids: number[] }) => req<EvalRun>('/api/evals', { method: 'POST', body: JSON.stringify(b) }),
     outputs: (id: number) => req<RunOutput[]>(`/api/evals/${id}/outputs`),
     report: (id: number) => req<Report>(`/api/evals/${id}/report`),
+  },
+  blind: {
+    outputs: (runId: number) =>
+      req<{ outputs: BlindOutput[]; models: Array<{ id: number; name: string }> }>(`/api/blind/${runId}/outputs`),
+    vote: (b: { run_id: number; case_id: number; winner_model_id: number; loser_model_id: number }) =>
+      req<{ id: number }>('/api/blind/votes', { method: 'POST', body: JSON.stringify(b) }),
+    elo: (runId: number) => req<EloRow[]>(`/api/blind/${runId}/elo`),
+    calibration: (runId: number) => req<Calibration>(`/api/blind/${runId}/calibration`),
   },
 };

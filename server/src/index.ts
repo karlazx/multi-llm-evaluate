@@ -6,6 +6,7 @@ import { migrate } from './db.js';
 import { caseRoutes } from './routes/cases.js';
 import { modelRoutes } from './routes/models.js';
 import { evalRoutes } from './routes/evals.js';
+import { blindRoutes } from './routes/blind.js';
 
 async function main() {
   assertConfig();
@@ -21,6 +22,7 @@ async function main() {
   await app.register(caseRoutes);
   await app.register(modelRoutes);
   await app.register(evalRoutes);
+  await app.register(blindRoutes);
 
   await app.listen({ port: config.port, host: config.host });
   console.log(`[server] http://${config.host}:${config.port}`);
