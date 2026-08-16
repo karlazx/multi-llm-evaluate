@@ -27,7 +27,7 @@
 
 - DeepSeek 直连：`OPENAI_*` / `ANTHROPIC_*`（走 `.env`，gitignore）。
 - 胜算云：`SSY_API_KEY` / `SSY_BASE_URL`（`.env`）。
-- 服务器：`ubuntu@43.163.231.159`，SSH 免密已通，PostgreSQL 14.20 已装（M1 起用）。
+- 服务器：`ubuntu@<服务器IP>`，SSH 免密已通，PostgreSQL 14.20 已装（M1 起用）。
 
 ## 四、产物清单
 

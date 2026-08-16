@@ -80,7 +80,7 @@ docker run -d -p 8787:8787 \
 
 | Secret | 说明 |
 |---|---|
-| `SSH_HOST` | 服务器地址（如 43.163.231.159） |
+| `SSH_HOST` | 服务器地址（如 your-server-ip） |
 | `SSH_USER` | 服务器用户（如 ubuntu） |
 | `SSH_KEY` | SSH 私钥（用于免密登录） |
 | `GH_PAT` | 带 `read:packages` 的 PAT（服务器拉取私有镜像用） |
