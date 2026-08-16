@@ -36,20 +36,24 @@ jobs:
 
       - name: SSH 部署到 Ubuntu
         uses: appleboy/ssh-action@v1
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         with:
           host: ${{ secrets.SSH_HOST }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
-          envs: DATABASE_URL,ENCRYPTION_KEY
+          envs: DATABASE_URL,ENCRYPTION_KEY,GH_PAT
           script: |
-            echo "${{ secrets.GH_PAT }}" | docker login ghcr.io -u karlazx --password-stdin
+            echo "$GH_PAT" | docker login ghcr.io -u karlazx --password-stdin
             docker pull ${{ env.IMAGE }}:latest
             docker stop multi-llm-evaluate 2>/dev/null || true
             docker rm multi-llm-evaluate 2>/dev/null || true
             docker run -d --name multi-llm-evaluate \
-              -p 8787:8787 \
-              --add-host host.docker.internal:host-gateway \
+              --network host \
               -e DATABASE_URL="$DATABASE_URL" \
               -e ENCRYPTION_KEY="$ENCRYPTION_KEY" \
+              -e HOST=0.0.0.0 \
               --restart unless-stopped \
               ${{ env.IMAGE }}:latest

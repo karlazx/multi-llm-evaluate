@@ -1,13 +1,11 @@
 services:
   app:
     build: .
-    ports:
-      - "8787:8787"
+    network_mode: host
     environment:
       NODE_ENV: production
-      # 由部署机 .env / CI secrets 注入
+      HOST: 0.0.0.0
+      # 由部署机 .env / CI secrets 注入（--network host 下 127.0.0.1 即宿主机 PG）
       DATABASE_URL: ${DATABASE_URL}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY}
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     restart: unless-stopped

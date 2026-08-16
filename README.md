@@ -65,10 +65,10 @@ npm run web:dev
 
 ```bash
 docker build -t multi-llm-evaluate .
-docker run -d -p 8787:8787 \
-  --add-host host.docker.internal:host-gateway \
-  -e DATABASE_URL='postgres://user:pass@host.docker.internal:5432/llm_evaluate' \
+docker run -d --name multi-llm-evaluate --network host \
+  -e DATABASE_URL='postgres://user:pass@127.0.0.1:5432/llm_evaluate' \
   -e ENCRYPTION_KEY='<64位hex>' \
+  -e HOST=0.0.0.0 \
   multi-llm-evaluate
 ```
 
@@ -84,7 +84,7 @@ docker run -d -p 8787:8787 \
 | `SSH_USER` | 服务器用户（如 ubuntu） |
 | `SSH_KEY` | SSH 私钥（用于免密登录） |
 | `GH_PAT` | 带 `read:packages` 的 PAT（服务器拉取私有镜像用） |
-| `DATABASE_URL` | 容器内连宿主机 PG：`postgres://…@host.docker.internal:5432/…` |
+| `DATABASE_URL` | 容器连宿主机 PG（`--network host` 下走 127.0.0.1）：`postgres://…@127.0.0.1:5432/…` |
 | `ENCRYPTION_KEY` | AES-256-GCM 密钥（64 位 hex） |
 
 ## 安全约束
