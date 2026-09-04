@@ -31,8 +31,8 @@
 
 ## 四、产物清单
 
-- `m0/demo.ts` — 三协议冒烟 + 三用例 × 两协议 demo（llm-rubric / javascript 断言 / 判分器自测）
-- `m0/judges.ts` — L1 判分器（题2 24点、题3 密码锁，mathjs 安全求值，禁原生 eval，支持 LaTeX/√）
+- `scripts/m0/demo.ts` — 三协议冒烟 + 三用例 × 两协议 demo（llm-rubric / javascript 断言 / 判分器自测）
+- `scripts/m0/judges.ts` — L1 判分器（题2 24点、题3 密码锁，mathjs 安全求值，禁原生 eval，支持 LaTeX/√）
 - `.env.example` / `.gitignore` / `tsconfig.json` / `LICENSE`(MIT)
 
 ## 五、复现方式

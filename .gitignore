@@ -11,7 +11,7 @@ data/
 dist/
 
 # 本地私密文档（含真实凭据，绝不入库）
-/private/
+/docs/private/
 
 # logs / OS noise
 *.log

@@ -102,8 +102,16 @@ docker run -d --name multi-llm-evaluate --network host \
 ## 目录结构
 
 ```
-server/   # Fastify 后端（src/routes、src/services、src/migrations）
-web/      # React 前端（src/pages：用例/模型/评测/报告/盲评）
-m0/       # M0 技术验证 demo
-docs/     # 阶段报告
+server/           # Fastify 后端（src/routes、src/services、src/migrations）
+web/              # React 前端（src/pages：用例/模型/评测/报告/盲评）
+scripts/m0/       # M0 技术验证 demo（三协议冒烟 + 判分器样例，历史存档）
+deploy/nas/       # NAS 局域网部署（双容器 compose + 部署脚本）
+docs/
+├── plan/         # 立项：可行性分析、落地方案、市场调研、开发任务包
+├── acceptance/   # 验收：M0-M4 验收记录、UAT 报告
+├── deploy/       # 部署方案（NAS）
+├── assets/       # 素材：评测题集、模型单价清单
+├── m0-report.md  # M0 阶段报告
+└── private/      # 本地私密运维文档（含真实凭据，.gitignore 屏蔽，不入库）
+data/snapshots/   # 运行时产物：每轮评测的原始输出 JSON 快照（非文档，.gitignore 屏蔽）
 ```
