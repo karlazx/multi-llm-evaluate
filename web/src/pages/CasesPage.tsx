@@ -33,6 +33,10 @@ export default function CasesPage() {
   const [saving, setSaving] = useState(false);
   const [detail, setDetail] = useState<CaseRow | null>(null);
   const [toArchive, setToArchive] = useState<CaseRow | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importText, setImportText] = useState('');
+  const [importErr, setImportErr] = useState('');
+  const [importingBusy, setImportingBusy] = useState(false);
 
   async function load() {
     try { setRows(await api.cases.list()); }
@@ -90,6 +94,24 @@ export default function CasesPage() {
     finally { setSaving(false); }
   }
 
+  async function doImport() {
+    setImportErr('');
+    let parsed: unknown;
+    try { parsed = JSON.parse(importText); }
+    catch { setImportErr('JSON 格式不合法，请检查'); return; }
+    const items = Array.isArray(parsed) ? parsed : (parsed as { cases?: unknown[] })?.cases;
+    if (!Array.isArray(items) || items.length === 0) { setImportErr('需要 JSON 数组，至少 1 条'); return; }
+    setImportingBusy(true);
+    try {
+      const r = await api.cases.import(items as Array<Record<string, unknown>>);
+      toast('success', `导入完成：成功 ${r.inserted} 条${r.failed ? `，失败 ${r.failed} 条` : ''}`);
+      if (r.failed) setImportErr(r.errors.map((e) => `第 ${e.index + 1} 条：${e.reason}`).join('；'));
+      else { setImporting(false); setImportText(''); }
+      await load();
+    } catch (e) { setImportErr('导入失败：' + (e as Error).message); }
+    finally { setImportingBusy(false); }
+  }
+
   async function archive(c: CaseRow) {
     try {
       await api.cases.archive(c.id);
@@ -115,7 +137,10 @@ export default function CasesPage() {
           <h2>用例库</h2>
           <div className="page-sub">{rows ? `${rows.filter((c) => c.status === 'active').length} 个活跃用例` : '加载中…'}</div>
         </div>
-        <button className="btn primary" onClick={openCreate}>+ 新建用例</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn" onClick={() => { setImporting(true); setImportErr(''); }}>批量导入</button>
+          <button className="btn primary" onClick={openCreate}>+ 新建用例</button>
+        </div>
       </div>
 
       <div className="card">
@@ -250,6 +275,31 @@ export default function CasesPage() {
               <div><Badge variant="primary">{detail.assertion_script}</Badge></div>
             </div>
           )}
+        </Drawer>
+      )}
+
+      {importing && (
+        <Drawer
+          title="批量导入用例"
+          onClose={() => setImporting(false)}
+          footer={<>
+            <button className="btn ghost" onClick={() => setImporting(false)}>取消</button>
+            <button className="btn primary" disabled={importingBusy} onClick={doImport}>{importingBusy ? '导入中…' : '导入'}</button>
+          </>}
+        >
+          <div className="field">
+            <label className="field-label">JSON 数组（每项含 title、prompt 必填）</label>
+            <textarea
+              className="textarea"
+              rows={12}
+              value={importText}
+              onChange={(e) => setImportText(e.target.value)}
+              placeholder={'[\n  {\n    "title": "用例标题",\n    "prompt": "完整提示词",\n    "dimension": "推理",\n    "type": "objective",\n    "expected_answer": "可选",\n    "rubric": "可选"\n  }\n]'}
+              style={{ fontFamily: 'var(--mono)', fontSize: 12.5 }}
+            />
+            {importErr && <div className="field-error">{importErr}</div>}
+            <div className="field-hint">type 可选 objective / subjective / code；dimension 可选 代码/写作/推理/长文本/工具调用/多模态/其他</div>
+          </div>
         </Drawer>
       )}
 

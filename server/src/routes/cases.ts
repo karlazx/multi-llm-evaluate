@@ -65,6 +65,39 @@ export async function caseRoutes(app: FastifyInstance) {
     return rows[0];
   });
 
+  // 批量导入：JSON 数组，每项 { title, prompt, dimension?, type?, expected_answer?, rubric? }
+  app.post('/api/cases/import', async (req) => {
+    const body = req.body;
+    const items = Array.isArray(body) ? body : (body as { cases?: unknown[] })?.cases;
+    if (!Array.isArray(items) || items.length === 0) {
+      return app.httpErrors.badRequest('需要 JSON 数组（或 { cases: [...] }），至少 1 条');
+    }
+    let inserted = 0;
+    const errors: Array<{ index: number; reason: string }> = [];
+    for (let i = 0; i < items.length; i++) {
+      const b = items[i] as Record<string, unknown>;
+      if (!b || typeof b.title !== 'string' || !b.title.trim()) { errors.push({ index: i, reason: 'title 缺失' }); continue; }
+      if (typeof b.prompt !== 'string' || !b.prompt.trim()) { errors.push({ index: i, reason: 'prompt 缺失' }); continue; }
+      await query(
+        `INSERT INTO cases (title, prompt, dimension, type, expected_answer, rubric, assertion_script, source, tags)
+         VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+        [
+          b.title.trim(),
+          b.prompt,
+          typeof b.dimension === 'string' ? b.dimension : null,
+          typeof b.type === 'string' ? b.type : 'subjective',
+          typeof b.expected_answer === 'string' ? b.expected_answer : null,
+          typeof b.rubric === 'string' ? b.rubric : null,
+          typeof b.assertion_script === 'string' ? b.assertion_script : null,
+          typeof b.source === 'string' ? b.source : 'self',
+          Array.isArray(b.tags) ? b.tags : null,
+        ],
+      );
+      inserted++;
+    }
+    return { inserted, failed: errors.length, errors };
+  });
+
   // 停用不删（status → archived）
   app.delete('/api/cases/:id', async (req) => {
     const { id } = req.params as { id: string };

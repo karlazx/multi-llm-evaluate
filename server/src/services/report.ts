@@ -140,3 +140,58 @@ export function reportToMarkdown(r: Report): string {
 
   return L.join('\n');
 }
+
+function esc(s: unknown): string {
+  return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+/** 报告 → 打印友好 HTML（浏览器"打印为 PDF"，A4 排版） */
+export function reportToHtml(r: Report): string {
+  const dims = Array.from(new Set(r.dimensions.map((d) => d.dimension)));
+  const models = Array.from(new Set(r.ranking.map((x) => x.model_name)));
+  const rankRows = r.ranking
+    .map((x, i) => `<tr><td>${i + 1}</td><td>${esc(x.model_name)}</td><td class="num">${esc(x.avg_score ?? '-')}</td></tr>`)
+    .join('');
+  const dimHeader = models.map((m) => `<th>${esc(m)}</th>`).join('');
+  const dimRows = dims
+    .map((d) => {
+      const cells = models
+        .map((m) => `<td class="num">${esc(r.dimensions.find((x) => x.dimension === d && x.model_name === m)?.avg_score ?? '-')}</td>`)
+        .join('');
+      return `<tr><td>${esc(d)}</td>${cells}</tr>`;
+    })
+    .join('');
+  const costRows = r.costs
+    .map((c) => `<tr><td>${esc(c.model_name)}</td><td class="num">${c.total_cost_usd != null ? '$' + Number(c.total_cost_usd).toFixed(6) : '-'}</td><td class="num">${esc(c.total_tokens ?? '-')}</td><td class="num">${c.avg_latency_ms != null ? c.avg_latency_ms + 'ms' : '-'}</td></tr>`)
+    .join('');
+  const detailRows = r.details
+    .map((d) => `<tr><td>${esc(d.case_title)}</td><td>${esc(d.dimension ?? '-')}</td><td>${esc(d.model_name)}</td><td class="num">${d.score != null ? Number(d.score).toFixed(1) : '-'}</td><td>${esc((d.reason ?? '').slice(0, 140))}</td></tr>`)
+    .join('');
+
+  return `<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8">
+<title>评测报告（轮次 ${r.run_ids.join(', ')}）</title>
+<style>
+  body { font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; color: #16181d; margin: 32px; font-size: 13px; }
+  h1 { font-size: 20px; } h2 { font-size: 15px; margin-top: 26px; }
+  .meta { color: #8b93a5; font-size: 12px; margin-bottom: 18px; }
+  table { width: 100%; border-collapse: collapse; margin-top: 8px; page-break-inside: auto; }
+  th, td { border: 1px solid #d9dee8; padding: 6px 10px; text-align: left; }
+  th { background: #f2f4f8; font-size: 12px; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  tr { page-break-inside: avoid; }
+  @media print { body { margin: 12mm; } }
+</style></head><body>
+<h1>评测报告</h1>
+<div class="meta">轮次 ${r.run_ids.map((x) => '#' + x).join('、')} ｜ 生成时间：${esc(r.generated_at)}</div>
+<h2>① 总分排行</h2>
+<table><thead><tr><th>名次</th><th>模型</th><th>平均分（0-100）</th></tr></thead><tbody>${rankRows}</tbody></table>
+<h2>② 分维度得分</h2>
+<table><thead><tr><th>维度</th>${dimHeader}</tr></thead><tbody>${dimRows}</tbody></table>
+<h2>③ 成本 / token / 耗时</h2>
+<table><thead><tr><th>模型</th><th>总成本（USD）</th><th>总 token</th><th>平均延迟</th></tr></thead><tbody>${costRows}</tbody></table>
+<h2>④ 单用例穿透</h2>
+<table><thead><tr><th>用例</th><th>维度</th><th>模型</th><th>得分</th><th>判分理由</th></tr></thead><tbody>${detailRows}</tbody></table>
+<script>window.onload = () => { /* 便于直接 Ctrl/Cmd+P 打印为 PDF */ };</script>
+</body></html>`;
+}

@@ -1,7 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { query } from '../db.js';
 import { runEval } from '../services/evalRunner.js';
-import { aggregateReport, buildReport, reportToMarkdown } from '../services/report.js';
+import { aggregateReport, buildReport, reportToHtml, reportToMarkdown } from '../services/report.js';
+import { getPairwise, runPairwise } from '../services/pairwise.js';
 
 export async function evalRoutes(app: FastifyInstance) {
   app.get('/api/evals', async () => {
@@ -61,12 +62,32 @@ export async function evalRoutes(app: FastifyInstance) {
     return buildReport(Number(id));
   });
 
-  // 报告导出 Markdown（Content-Type: text/markdown，可直接下载）
+  // 报告导出：?format=md（默认，Markdown）| pdf（打印友好 HTML，浏览器打印为 PDF）
   app.get('/api/evals/:id/export', async (req, reply) => {
     const { id } = req.params as { id: string };
-    const md = reportToMarkdown(await buildReport(Number(id)));
+    const { format } = req.query as { format?: string };
+    const report = await buildReport(Number(id));
+    if (format === 'pdf') {
+      reply.type('text/html; charset=utf-8');
+      return reportToHtml(report);
+    }
     reply.type('text/markdown; charset=utf-8');
-    return md;
+    return reportToMarkdown(report);
+  });
+
+  // pairwise 对评（AI 裁判 + 位置交换消偏）：按需触发
+  app.post('/api/evals/:id/pairwise', async (req) => {
+    const { id } = req.params as { id: string };
+    try {
+      return await runPairwise(Number(id));
+    } catch (e) {
+      return app.httpErrors.badRequest((e as Error).message);
+    }
+  });
+
+  app.get('/api/evals/:id/pairwise', async (req) => {
+    const { id } = req.params as { id: string };
+    return getPairwise(Number(id));
   });
 
   // 跨轮次对比（增量评测：新模型跑完并入历史轮次一起看）

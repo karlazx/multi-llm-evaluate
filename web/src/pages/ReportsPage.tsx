@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
-import { api, type EvalRun, type Report } from '../api';
+import { api, type EvalRun, type PairwiseRow, type Report } from '../api';
 import { useToast } from '../ui/toast';
 import { Empty, Skeleton } from '../ui/bits';
 
@@ -15,15 +15,30 @@ export default function ReportsPage() {
   const [report, setReport] = useState<Report | null>(null);
   const [compareIds, setCompareIds] = useState<number[]>([]);
   const [loading, setLoading] = useState(false);
+  const [pairwise, setPairwise] = useState<PairwiseRow[]>([]);
+  const [pairwiseBusy, setPairwiseBusy] = useState(false);
 
   useEffect(() => { void api.evals.list().then(setRuns); }, []);
 
   async function open(id: number) {
     setSelected(id);
     setLoading(true);
-    try { setReport(await api.evals.report(id)); }
-    catch (e) { toast('error', '加载报告失败：' + (e as Error).message); }
+    try {
+      setReport(await api.evals.report(id));
+      setPairwise(await api.evals.pairwise(id));
+    } catch (e) { toast('error', '加载报告失败：' + (e as Error).message); }
     finally { setLoading(false); }
+  }
+
+  async function runPairwise() {
+    if (!selected) return;
+    setPairwiseBusy(true);
+    try {
+      const r = await api.evals.runPairwise(selected);
+      toast('success', `pairwise 对评完成：${r.judged} 组`);
+      setPairwise(await api.evals.pairwise(selected));
+    } catch (e) { toast('error', '对评失败：' + (e as Error).message); }
+    finally { setPairwiseBusy(false); }
   }
 
   function toggleCompare(id: number) {
@@ -76,7 +91,12 @@ export default function ReportsPage() {
           <h2>评测报告</h2>
           <div className="page-sub">总分排行 · 分维度 · 成本看板 · 单用例穿透</div>
         </div>
-        {selected && report && <button className="btn primary" onClick={exportMd}>导出 Markdown</button>}
+        {selected && report && (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn" onClick={exportMd}>导出 Markdown</button>
+            <button className="btn primary" onClick={() => window.open(api.evals.exportPdfUrl(selected), '_blank')}>导出 PDF</button>
+          </div>
+        )}
       </div>
 
       <div className="card card-pad">
@@ -182,6 +202,40 @@ export default function ReportsPage() {
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div className="card">
+            <div className="row-split" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
+              <h3 style={{ margin: 0 }}>⑤ Pairwise 对评（AI 裁判 · 位置交换消偏）</h3>
+              <button className="btn sm primary" disabled={pairwiseBusy} onClick={runPairwise}>
+                {pairwiseBusy ? '对评中…' : '运行对评'}
+              </button>
+            </div>
+            {pairwise.length === 0 ? (
+              <Empty icon="⚖️" title="还没有对评结果" sub="点右上角「运行对评」：裁判模型对每组输出做 AB/BA 两轮比较取平均，消除位置偏差" />
+            ) : (
+              <div className="table-wrap">
+                <table className="table">
+                  <thead><tr><th>用例</th><th>模型 A</th><th>模型 B</th><th>A 胜</th><th>B 胜</th><th>结论</th></tr></thead>
+                  <tbody>
+                    {pairwise.map((p) => {
+                      const wa = Number(p.wins_a); const wb = Number(p.wins_b);
+                      const winner = wa > wb ? p.model_a_display : wb > wa ? p.model_b_display : '平局';
+                      return (
+                        <tr key={p.id}>
+                          <td>{p.case_title}</td>
+                          <td>{p.model_a_display}</td>
+                          <td>{p.model_b_display}</td>
+                          <td className="mono">{wa}</td>
+                          <td className="mono">{wb}</td>
+                          <td style={{ fontWeight: 600 }} title={`A在前: ${p.reason_ab ?? ''}｜交换后: ${p.reason_ba ?? ''}`}>{winner}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </>
       ) : null}

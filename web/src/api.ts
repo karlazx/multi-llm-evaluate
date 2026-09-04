@@ -60,6 +60,20 @@ export interface Report {
   }>;
 }
 
+export interface PairwiseRow {
+  id: number;
+  case_id: number;
+  case_title: string;
+  model_a_id: number;
+  model_b_id: number;
+  model_a_display: string;
+  model_b_display: string;
+  wins_a: number;
+  wins_b: number;
+  reason_ab: string | null;
+  reason_ba: string | null;
+}
+
 export interface BlindOutput {
   case_id: number;
   model_id: number;
@@ -111,6 +125,8 @@ export const api = {
   cases: {
     list: () => req<CaseRow[]>('/api/cases'),
     create: (b: Partial<CaseRow>) => req<CaseRow>('/api/cases', { method: 'POST', body: JSON.stringify(b) }),
+    import: (cases: Array<Record<string, unknown>>) =>
+      req<{ inserted: number; failed: number; errors: Array<{ index: number; reason: string }> }>('/api/cases/import', { method: 'POST', body: JSON.stringify(cases) }),
     update: (id: number, b: Partial<CaseRow>) => req<CaseRow>(`/api/cases/${id}`, { method: 'PUT', body: JSON.stringify(b) }),
     archive: (id: number) => req<{ ok: boolean }>(`/api/cases/${id}`, { method: 'DELETE' }),
   },
@@ -128,7 +144,10 @@ export const api = {
     outputs: (id: number) => req<RunOutput[]>(`/api/evals/${id}/outputs`),
     report: (id: number) => req<Report>(`/api/evals/${id}/report`),
     exportMd: async (id: number) => (await fetch(`/api/evals/${id}/export`)).text(),
+    exportPdfUrl: (id: number) => `/api/evals/${id}/export?format=pdf`,
     compare: (ids: number[]) => req<Report>(`/api/evals/compare?run_ids=${ids.join(',')}`),
+    runPairwise: (id: number) => req<{ pairs: number; judged: number }>(`/api/evals/${id}/pairwise`, { method: 'POST' }),
+    pairwise: (id: number) => req<PairwiseRow[]>(`/api/evals/${id}/pairwise`),
   },
   blind: {
     outputs: (runId: number) =>
