@@ -46,8 +46,9 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           envs: DATABASE_URL,ENCRYPTION_KEY,GH_PAT
           script: |
+            set -e
             echo "$GH_PAT" | docker login ghcr.io -u karlazx --password-stdin
-            docker pull ${{ env.IMAGE }}:latest
+            docker pull ${{ env.IMAGE }}:latest || { echo "拉取镜像失败，终止部署"; exit 1; }
             docker stop multi-llm-evaluate 2>/dev/null || true
             docker rm multi-llm-evaluate 2>/dev/null || true
             docker run -d --name multi-llm-evaluate \
