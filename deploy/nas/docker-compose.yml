@@ -1,0 +1,50 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: mle-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: mle
+      POSTGRES_USER: mle
+      POSTGRES_PASSWORD: ${PG_PASSWORD}
+    volumes:
+      - ./data/pg:/var/lib/postgresql/data
+    networks:
+      - mle-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mle"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    image: ghcr.io/karlazx/multi-llm-evaluate:latest
+    container_name: mle-app
+    restart: unless-stopped
+    ports:
+      - "8788:8787"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://mle:${PG_PASSWORD}@db:5432/mle
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY}
+      # ── 模型 API 配置（复用 Ubuntu 的 key）──
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      OPENAI_BASE_URL: ${OPENAI_BASE_URL}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      ANTHROPIC_AUTH_TOKEN: ${ANTHROPIC_AUTH_TOKEN}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL}
+      SSY_API_KEY: ${SSY_API_KEY}
+      SSY_BASE_URL: ${SSY_BASE_URL}
+    volumes:
+      - ./data/snapshots:/app/data/snapshots
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - mle-net
+
+networks:
+  mle-net:
+    driver: bridge

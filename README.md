@@ -87,6 +87,11 @@ docker run -d --name multi-llm-evaluate --network host \
 | `DATABASE_URL` | 容器连宿主机 PG（`--network host` 下走 127.0.0.1）：`postgres://…@127.0.0.1:5432/…` |
 | `ENCRYPTION_KEY` | AES-256-GCM 密钥（64 位 hex） |
 
+### NAS 部署（局域网）
+
+家庭 NAS（双容器 mle-app + mle-postgres，端口 8788）的部署文件与说明见
+[`deploy/nas/`](deploy/nas/)，方案细节见 [`docs/deploy/NAS部署方案.md`](docs/deploy/NAS部署方案.md)。
+
 ## 安全约束
 
 - 模型 key 只存服务器（AES 加密 + `.env` gitignore），GitHub 用 Secrets。
