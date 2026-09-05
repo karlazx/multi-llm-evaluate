@@ -1,4 +1,8 @@
-name: build-and-deploy
+name: build-and-push
+
+# 策略（2026-09-05 起）：生产环境只在家庭 NAS（192.168.31.251:8788）。
+# CI 只负责构建镜像并推送 GHCR；NAS 在局域网内手动拉取更新（见 deploy/nas/README.md）。
+# 云服务器部署已退役（容器已停止），不再通过 CI 部署。
 
 on:
   push:
@@ -10,7 +14,7 @@ env:
   IMAGE: ghcr.io/karlazx/multi-llm-evaluate
 
 jobs:
-  build-and-deploy:
+  build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -33,28 +37,3 @@ jobs:
           tags: |
             ${{ env.IMAGE }}:latest
             ${{ env.IMAGE }}:${{ github.sha }}
-
-      - name: SSH 部署到 Ubuntu
-        uses: appleboy/ssh-action@v1
-        env:
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          ENCRYPTION_KEY: ${{ secrets.ENCRYPTION_KEY }}
-          GH_PAT: ${{ secrets.GH_PAT }}
-        with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          envs: DATABASE_URL,ENCRYPTION_KEY,GH_PAT
-          script: |
-            set -e
-            echo "$GH_PAT" | docker login ghcr.io -u karlazx --password-stdin
-            docker pull ${{ env.IMAGE }}:latest || { echo "拉取镜像失败，终止部署"; exit 1; }
-            docker stop multi-llm-evaluate 2>/dev/null || true
-            docker rm multi-llm-evaluate 2>/dev/null || true
-            docker run -d --name multi-llm-evaluate \
-              --network host \
-              -e DATABASE_URL="$DATABASE_URL" \
-              -e ENCRYPTION_KEY="$ENCRYPTION_KEY" \
-              -e HOST=0.0.0.0 \
-              --restart unless-stopped \
-              ${{ env.IMAGE }}:latest

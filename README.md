@@ -8,7 +8,7 @@
 - 前端：React + TypeScript（Vite）
 - 评测引擎：promptfoo（MIT，import 库方式）
 - 存储：PostgreSQL（`pg` 驱动）
-- 部署：Docker + GitHub Actions → GHCR → SSH 部署 Ubuntu
+- 部署：Docker（家庭 NAS，局域网）；GitHub Actions 只负责构建镜像推 GHCR
 
 ## 本地开发
 
@@ -72,20 +72,23 @@ docker run -d --name multi-llm-evaluate --network host \
   multi-llm-evaluate
 ```
 
-### GitHub Actions 一键部署
+### GitHub Actions 构建（NAS-only 部署）
 
-`.github/workflows/deploy.yml`：push main → 构建镜像 → 推 GHCR → SSH 部署。
+> 自 2026-09-05 起，生产环境只跑在家庭 NAS（`192.168.31.251:8788`）。
+> 云服务器部署已退役。
 
-需在仓库 Settings → Secrets 配置：
+`.github/workflows/deploy.yml`：push main → 构建镜像 → 推送 GHCR（`ghcr.io/karlazx/multi-llm-evaluate:latest`）。
 
-| Secret | 说明 |
-|---|---|
-| `SSH_HOST` | 服务器地址（如 your-server-ip） |
-| `SSH_USER` | 服务器用户（如 ubuntu） |
-| `SSH_KEY` | SSH 私钥（用于免密登录） |
-| `GH_PAT` | 带 `read:packages` 的 PAT（服务器拉取私有镜像用） |
-| `DATABASE_URL` | 容器连宿主机 PG（`--network host` 下走 127.0.0.1）：`postgres://…@127.0.0.1:5432/…` |
-| `ENCRYPTION_KEY` | AES-256-GCM 密钥（64 位 hex） |
+CI 不再 SSH 到任何服务器；NAS 在局域网内手动拉取更新：
+
+```bash
+# 在 NAS 的部署目录（含 docker-compose.yml）
+docker login ghcr.io -u <用户名>          # 用带 read:packages 的 PAT
+docker compose pull app
+docker compose up -d app
+```
+
+详见 [`deploy/nas/README.md`](deploy/nas/README.md)。
 
 ### NAS 部署（局域网）
 
