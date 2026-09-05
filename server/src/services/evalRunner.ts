@@ -39,11 +39,11 @@ function maxTokensFor(type: string, override?: number): number {
   return type === 'code' ? 16384 : 4096;
 }
 
-/** 无输出原因判定 */
+/** 无输出原因判定（length 优先：思考耗尽预算时断言 error 也会连带触发，不能误报为调用失败） */
 function noOutputReason(output: string | null | undefined, finishReason: string | null | undefined, error: string | null | undefined): string | null {
   if (output && output.trim() !== '') return null;
+  if (finishReason === 'length') return '无输出：模型把输出预算全部耗在思考/生成上（到达 max_tokens 截断，可加大输出上限或关闭思考）';
   if (error) return `调用失败：${String(error).slice(0, 200)}`;
-  if (finishReason === 'length') return '无输出：模型把输出预算全部耗在思考上（finishReason=length，可加大 max_tokens 或关闭思考）';
   return '模型返回空内容';
 }
 
