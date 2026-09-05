@@ -13,19 +13,28 @@ export async function blindRoutes(app: FastifyInstance) {
     return { outputs, models };
   });
 
-  // 投票回写
+  // 投票回写：winner_model_id 为 null = 弃权（都不合格）
   app.post('/api/blind/votes', async (req) => {
-    const b = req.body as { run_id: number; case_id: number; winner_model_id: number; loser_model_id: number; voter?: string };
-    if (!b.run_id || !b.case_id || !b.winner_model_id || !b.loser_model_id) {
-      return app.httpErrors.badRequest('run_id/case_id/winner_model_id/loser_model_id 必填');
+    const b = req.body as { run_id: number; case_id: number; winner_model_id: number | null; loser_model_id?: number | null; voter?: string };
+    if (!b.run_id || !b.case_id) return app.httpErrors.badRequest('run_id/case_id 必填');
+    const abstain = b.winner_model_id === null || b.winner_model_id === undefined;
+    if (!abstain) {
+      if (!b.loser_model_id) return app.httpErrors.badRequest('非弃权投票必须同时给 winner 与 loser');
+      if (b.winner_model_id === b.loser_model_id) return app.httpErrors.badRequest('不能投给自己');
     }
-    if (b.winner_model_id === b.loser_model_id) return app.httpErrors.badRequest('不能投给自己');
     const { rows } = await query(
       `INSERT INTO blind_votes (run_id, case_id, winner_model_id, loser_model_id, voter)
        VALUES ($1,$2,$3,$4,$5) RETURNING *`,
-      [b.run_id, b.case_id, b.winner_model_id, b.loser_model_id, b.voter ?? 'anonymous'],
+      [b.run_id, b.case_id, abstain ? null : b.winner_model_id, abstain ? null : b.loser_model_id, b.voter ?? 'anonymous'],
     );
     return rows[0];
+  });
+
+  // 清空本轮全部投票（重新盲评）
+  app.delete('/api/blind/:runId/votes', async (req) => {
+    const { runId } = req.params as { runId: string };
+    const r = await query('DELETE FROM blind_votes WHERE run_id=$1 RETURNING id', [runId]);
+    return { ok: true, deleted: r.rows.length };
   });
 
   // ELO 排名

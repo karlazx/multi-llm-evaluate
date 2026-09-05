@@ -5,16 +5,27 @@ import { encrypt, decrypt, maskKey } from '../crypto.js';
 import { buildProvider } from '../services/providers.js';
 
 function publicModel(row: Record<string, unknown>) {
+  let masked = '';
+  if (row.api_key_enc) {
+    try {
+      masked = maskKey(decrypt(row.api_key_enc as string));
+    } catch {
+      masked = '(无法解密，请重新录入 Key)';
+    }
+  }
   return {
     ...row,
     api_key_enc: undefined,
-    api_key_masked: row.api_key_enc ? maskKey(decrypt(row.api_key_enc as string)) : '',
+    api_key_masked: masked,
   };
 }
 
 export async function modelRoutes(app: FastifyInstance) {
-  app.get('/api/models', async () => {
-    const { rows } = await query('SELECT * FROM models ORDER BY id');
+  app.get('/api/models', async (req) => {
+    const { status } = req.query as { status?: string };
+    const { rows } = status
+      ? await query('SELECT * FROM models WHERE status=$1 ORDER BY id DESC', [status])
+      : await query('SELECT * FROM models ORDER BY id DESC');
     return rows.map(publicModel);
   });
 

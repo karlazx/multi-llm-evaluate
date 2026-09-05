@@ -22,6 +22,7 @@ export default function CasesPage() {
   const [q, setQ] = useState('');
   const [fDim, setFDim] = useState('');
   const [fType, setFType] = useState('');
+  const [fStatus, setFStatus] = useState('active');
   const [sort, setSort] = useState<{ key: keyof CaseRow; asc: boolean }>({ key: 'id', asc: true });
   const [page, setPage] = useState(1);
 
@@ -39,10 +40,10 @@ export default function CasesPage() {
   const [importingBusy, setImportingBusy] = useState(false);
 
   async function load() {
-    try { setRows(await api.cases.list()); }
+    try { setRows(await api.cases.list(fStatus === 'all' ? undefined : fStatus)); }
     catch (e) { toast('error', '加载失败：' + (e as Error).message); setRows([]); }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [fStatus]);
 
   const filtered = useMemo(() => {
     if (!rows) return [];
@@ -147,6 +148,11 @@ export default function CasesPage() {
         <div className="row-split" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
           <input className="input" style={{ maxWidth: 300 }} placeholder="搜索标题 / prompt…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
           <div style={{ display: 'flex', gap: 8 }}>
+            <select className="select" style={{ width: 110 }} value={fStatus} onChange={(e) => { setFStatus(e.target.value); setPage(1); }}>
+              <option value="active">启用</option>
+              <option value="archived">已停用</option>
+              <option value="all">全部</option>
+            </select>
             <select className="select" style={{ width: 130 }} value={fDim} onChange={(e) => { setFDim(e.target.value); setPage(1); }}>
               <option value="">全部维度</option>
               {DIMENSIONS.map((d) => <option key={d} value={d}>{d}</option>)}

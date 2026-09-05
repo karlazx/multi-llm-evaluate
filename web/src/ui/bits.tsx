@@ -7,7 +7,7 @@ export function Badge({ variant, children }: { variant?: 'primary' | 'success' |
 /** 状态 → 徽章变体 */
 export function statusBadge(status: string) {
   const map: Record<string, 'success' | 'warning' | 'danger' | 'primary' | undefined> = {
-    done: 'success', active: 'success', running: 'primary', pending: 'warning', failed: 'danger', archived: undefined,
+    done: 'success', active: 'success', running: 'primary', pending: 'warning', failed: 'danger', stopped: 'warning', archived: undefined,
   };
   return <Badge variant={map[status]}>{status}</Badge>;
 }

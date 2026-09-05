@@ -27,11 +27,12 @@ export async function caseOutputs(runId: number) {
   return rows;
 }
 
-/** ELO 排名（含人工投票数） */
+/** ELO 排名（弃权票"都不合格"不计入 ELO） */
 export async function eloRanking(runId: number) {
   const votes = (
     await query(
-      `SELECT winner_model_id AS winner, loser_model_id AS loser FROM blind_votes WHERE run_id=$1`,
+      `SELECT winner_model_id AS winner, loser_model_id AS loser FROM blind_votes
+       WHERE run_id=$1 AND winner_model_id IS NOT NULL AND loser_model_id IS NOT NULL`,
       [runId],
     )
   ).rows as Vote[];
@@ -57,8 +58,15 @@ export async function eloRanking(runId: number) {
     .sort((a, b) => b.elo - a.elo);
 }
 
-/** 校准面板：AI 分 vs 人工投票一致性（AI 高分者是否赢得人工投票） */
+/** 校准面板：AI 分 vs 人工投票一致性（弃权票单独统计，不参与一致性） */
 export async function calibration(runId: number) {
+  const abstain = (
+    await query(
+      `SELECT COUNT(*)::int AS n FROM blind_votes WHERE run_id=$1 AND winner_model_id IS NULL`,
+      [runId],
+    )
+  ).rows[0]?.n ?? 0;
+
   const votes = (
     await query(
       `SELECT v.case_id, v.winner_model_id AS winner, v.loser_model_id AS loser,
@@ -66,7 +74,7 @@ export async function calibration(runId: number) {
        FROM blind_votes v
        LEFT JOIN judge_scores ws ON ws.run_id=v.run_id AND ws.case_id=v.case_id AND ws.model_id=v.winner_model_id
        LEFT JOIN judge_scores ls ON ls.run_id=v.run_id AND ls.case_id=v.case_id AND ls.model_id=v.loser_model_id
-       WHERE v.run_id=$1`,
+       WHERE v.run_id=$1 AND v.winner_model_id IS NOT NULL`,
       [runId],
     )
   ).rows as Array<{ winner: number; loser: number; w_score: number | null; l_score: number | null }>;
@@ -91,5 +99,5 @@ export async function calibration(runId: number) {
   ).rows;
 
   const elo = await eloRanking(runId);
-  return { agreement, comparable, total_votes: votes.length, ai_avg: aiAvg, elo };
+  return { agreement, comparable, total_votes: votes.length, abstain, ai_avg: aiAvg, elo };
 }

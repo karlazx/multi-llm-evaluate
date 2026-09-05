@@ -27,6 +27,7 @@ export default function ModelsPage() {
   const [rows, setRows] = useState<ModelRow[] | null>(null);
   const [q, setQ] = useState('');
   const [fProto, setFProto] = useState('');
+  const [fStatus, setFStatus] = useState('active');
   const [page, setPage] = useState(1);
 
   const [editing, setEditing] = useState<ModelRow | null>(null);
@@ -39,10 +40,10 @@ export default function ModelsPage() {
   const [testing, setTesting] = useState<number | null>(null);
 
   async function load() {
-    try { setRows(await api.models.list()); }
+    try { setRows(await api.models.list(fStatus === 'all' ? undefined : fStatus)); }
     catch (e) { toast('error', '加载失败：' + (e as Error).message); setRows([]); }
   }
-  useEffect(() => { void load(); }, []);
+  useEffect(() => { void load(); /* eslint-disable-next-line */ }, [fStatus]);
 
   const filtered = useMemo(() => {
     if (!rows) return [];
@@ -130,10 +131,17 @@ export default function ModelsPage() {
       <div className="card">
         <div className="row-split" style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)' }}>
           <input className="input" style={{ maxWidth: 300 }} placeholder="搜索模型名 / 显示名…" value={q} onChange={(e) => { setQ(e.target.value); setPage(1); }} />
-          <select className="select" style={{ width: 220 }} value={fProto} onChange={(e) => { setFProto(e.target.value); setPage(1); }}>
-            <option value="">全部协议</option>
-            {PROTOCOLS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <select className="select" style={{ width: 110 }} value={fStatus} onChange={(e) => { setFStatus(e.target.value); setPage(1); }}>
+              <option value="active">启用</option>
+              <option value="archived">已停用</option>
+              <option value="all">全部</option>
+            </select>
+            <select className="select" style={{ width: 220 }} value={fProto} onChange={(e) => { setFProto(e.target.value); setPage(1); }}>
+              <option value="">全部协议</option>
+              {PROTOCOLS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+            </select>
+          </div>
         </div>
 
         {!rows ? (

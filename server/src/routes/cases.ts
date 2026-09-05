@@ -2,7 +2,7 @@ import type { FastifyInstance } from 'fastify';
 import { query } from '../db.js';
 
 export async function caseRoutes(app: FastifyInstance) {
-  // 列表（可选 status/dimension/type 过滤）
+  // 列表（可选 status/dimension/type 过滤；默认倒序，最新在前）
   app.get('/api/cases', async (req) => {
     const { status, dimension, type } = req.query as Record<string, string | undefined>;
     const conds: string[] = [];
@@ -11,7 +11,7 @@ export async function caseRoutes(app: FastifyInstance) {
     if (dimension) { params.push(dimension); conds.push(`dimension = $${params.length}`); }
     if (type) { params.push(type); conds.push(`type = $${params.length}`); }
     const where = conds.length ? `WHERE ${conds.join(' AND ')}` : '';
-    const { rows } = await query(`SELECT * FROM cases ${where} ORDER BY id`, params);
+    const { rows } = await query(`SELECT * FROM cases ${where} ORDER BY id DESC`, params);
     return rows;
   });
 

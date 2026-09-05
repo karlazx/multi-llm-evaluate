@@ -4,6 +4,10 @@ import { Drawer } from '../ui/Drawer';
 import { useToast } from '../ui/toast';
 import { Badge, Empty, Skeleton, statusBadge } from '../ui/bits';
 
+function fmtTime(iso?: string | null) {
+  return iso ? new Date(iso).toLocaleTimeString('zh-CN', { hour12: false }) : '—';
+}
+
 export default function EvalsPage() {
   const toast = useToast();
   const [runs, setRuns] = useState<EvalRun[] | null>(null);
@@ -12,6 +16,11 @@ export default function EvalsPage() {
   const [selCases, setSelCases] = useState<number[]>([]);
   const [selModels, setSelModels] = useState<number[]>([]);
   const [name, setName] = useState('');
+  const [showAdv, setShowAdv] = useState(false);
+  const [timeoutSecs, setTimeoutSecs] = useState('120');
+  const [maxTokens, setMaxTokens] = useState('');
+  const [maxCost, setMaxCost] = useState('');
+  const [concurrency, setConcurrency] = useState('2');
   const [activeRun, setActiveRun] = useState<EvalRun | null>(null);
   const [outputs, setOutputs] = useState<RunOutput[]>([]);
   const [detail, setDetail] = useState<RunOutput | null>(null);
@@ -19,10 +28,10 @@ export default function EvalsPage() {
   const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
   async function load() {
-    const [c, m, r] = await Promise.all([api.cases.list(), api.models.list(), api.evals.list()]);
-    setCases(c.filter((x) => x.status === 'active'));
-    setModels(m.filter((x) => x.status === 'active'));
-    setRuns(r);
+    const [c, m, r] = await Promise.all([
+      api.cases.list('active'), api.models.list('active'), api.evals.list(),
+    ]);
+    setCases(c); setModels(m); setRuns(r);
   }
   useEffect(() => {
     void load();
@@ -35,7 +44,12 @@ export default function EvalsPage() {
     if (!selCases.length || !selModels.length) { toast('error', '至少选一个用例和一个模型'); return; }
     setLaunching(true);
     try {
-      const run = await api.evals.create({ name: name || undefined, case_ids: selCases, model_ids: selModels });
+      const config: Record<string, unknown> = {};
+      if (Number(timeoutSecs) > 0) config.timeoutSecs = Number(timeoutSecs);
+      if (maxTokens && Number(maxTokens) > 0) config.maxOutputTokens = Number(maxTokens);
+      if (maxCost && Number(maxCost) > 0) config.maxCostUsd = Number(maxCost);
+      if (Number(concurrency) >= 1) config.concurrency = Number(concurrency);
+      const run = await api.evals.create({ name: name || undefined, case_ids: selCases, model_ids: selModels, config });
       toast('success', `评测 #${run.id} 已发起`);
       setActiveRun(run);
       setOutputs([]);
@@ -45,6 +59,17 @@ export default function EvalsPage() {
     finally { setLaunching(false); }
   }
 
+  async function rerun(r: EvalRun) {
+    try {
+      const run = await api.evals.rerun(r.id);
+      toast('success', `已发起重跑 → 新轮次 #${run.id}`);
+      setActiveRun(run);
+      setOutputs([]);
+      poll(run.id);
+      await load();
+    } catch (e) { toast('error', '重跑失败：' + (e as Error).message); }
+  }
+
   function poll(id: number) {
     if (timer.current) clearInterval(timer.current);
     timer.current = setInterval(async () => {
@@ -52,7 +77,7 @@ export default function EvalsPage() {
         const run = await api.evals.get(id);
         setActiveRun(run);
         setOutputs(await api.evals.outputs(id));
-        if (run.status === 'done' || run.status === 'failed') {
+        if (run.status === 'done' || run.status === 'failed' || run.status === 'stopped') {
           if (timer.current) clearInterval(timer.current);
           await load();
         }
@@ -77,6 +102,13 @@ export default function EvalsPage() {
       return { id: mid, name: model?.display_name ?? model?.name ?? `#${mid}`, done: doneCount, total: activeRun.case_ids.length };
     });
   }, [activeRun, outputs, models]);
+
+  const activeCfg = useMemo(() => {
+    if (!activeRun?.config_json) return {} as Record<string, unknown>;
+    return typeof activeRun.config_json === 'string' ? JSON.parse(activeRun.config_json) : activeRun.config_json;
+  }, [activeRun]);
+
+  const snap = detail?.snapshot_json;
 
   return (
     <div>
@@ -119,6 +151,33 @@ export default function EvalsPage() {
             </div>
           </div>
         </div>
+
+        <div className="row-split" style={{ marginTop: 14 }}>
+          <button className="btn ghost sm" onClick={() => setShowAdv((v) => !v)}>{showAdv ? '▾ 收起高级设置' : '▸ 高级设置（超时 / 费用阈值 / 输出上限 / 并发）'}</button>
+        </div>
+        {showAdv && (
+          <div className="form-grid" style={{ marginTop: 8, padding: '12px 14px', background: 'var(--bg-soft)', borderRadius: 'var(--radius-sm)' }}>
+            <div className="field">
+              <label className="field-label">单用例超时（秒）</label>
+              <input className="input" value={timeoutSecs} onChange={(e) => setTimeoutSecs(e.target.value)} />
+              <div className="field-hint">超时的用例标记失败并跳过，默认 120</div>
+            </div>
+            <div className="field">
+              <label className="field-label">最大输出 token（覆盖）</label>
+              <input className="input" value={maxTokens} onChange={(e) => setMaxTokens(e.target.value)} placeholder="留空 = 按类型自动（代码 16384 / 其他 4096）" />
+            </div>
+            <div className="field">
+              <label className="field-label">费用阈值（USD，选填）</label>
+              <input className="input" value={maxCost} onChange={(e) => setMaxCost(e.target.value)} placeholder="留空 = 不熔断" />
+              <div className="field-hint">累计实际费用超过阈值，立即停止剩余用例</div>
+            </div>
+            <div className="field">
+              <label className="field-label">用例并发数（1-4）</label>
+              <input className="input" value={concurrency} onChange={(e) => setConcurrency(e.target.value)} />
+            </div>
+          </div>
+        )}
+
         <div className="btn-row">
           <button className="btn primary" disabled={launching} onClick={launch}>{launching ? '发起中…' : `发起评测（${selCases.length} × ${selModels.length}）`}</button>
         </div>
@@ -130,6 +189,12 @@ export default function EvalsPage() {
             <h3 style={{ margin: 0 }}>轮次 #{activeRun.id}「{activeRun.name}」 {statusBadge(activeRun.status)}</h3>
             <span className="text-muted">产出 {outputs.length} / {total}</span>
           </div>
+          {Object.keys(activeCfg).filter((k) => !['case_ids', 'model_ids'].includes(k)).length > 0 && (
+            <div className="hint-bar">配置：{Object.entries(activeCfg).filter(([k]) => !['case_ids', 'model_ids'].includes(k)).map(([k, v]) => `${k}=${v}`).join(' · ')}</div>
+          )}
+          {activeRun.fail_reason && (
+            <div className="hint-bar text-danger">⚠ {activeRun.fail_reason}</div>
+          )}
           <div style={{ margin: '14px 0' }}>
             <div className="progress"><div className="progress-bar" style={{ width: `${progress * 100}%` }} /></div>
           </div>
@@ -154,20 +219,24 @@ export default function EvalsPage() {
           {outputs.length > 0 ? (
             <div className="table-wrap">
               <table className="table">
-                <thead><tr><th>用例</th><th>模型</th><th>延迟</th><th>token in/out</th><th>成本</th><th>输出预览</th></tr></thead>
+                <thead><tr><th>用例</th><th>模型</th><th>延迟</th><th>token in/out</th><th>成本</th><th>状态</th><th>输出预览</th></tr></thead>
                 <tbody>
-                  {outputs.map((o) => (
-                    <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => setDetail(o)}>
-                      <td>{o.case_title}</td>
-                      <td>{o.model_display ?? o.model_name}</td>
-                      <td className="mono">{o.latency_ms ?? '—'}ms</td>
-                      <td className="mono">{o.token_in ?? '—'} / {o.token_out ?? '—'}</td>
-                      <td className="mono">{o.cost_usd != null ? `$${Number(o.cost_usd).toFixed(6)}` : '—'}</td>
-                      <td className="text-muted" style={{ maxWidth: 300, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {o.raw_output ? o.raw_output.slice(0, 60) : '（无输出）'}
-                      </td>
-                    </tr>
-                  ))}
+                  {outputs.map((o) => {
+                    const noOut = o.raw_output == null || String(o.raw_output).trim() === '';
+                    return (
+                      <tr key={o.id} style={{ cursor: 'pointer' }} onClick={() => setDetail(o)}>
+                        <td>{o.case_title}</td>
+                        <td>{o.model_display ?? o.model_name}</td>
+                        <td className="mono">{o.latency_ms ?? '—'}ms</td>
+                        <td className="mono">{o.token_in ?? '—'} / {o.token_out ?? '—'}</td>
+                        <td className="mono">{o.cost_usd != null ? `$${Number(o.cost_usd).toFixed(6)}` : '—'}</td>
+                        <td>{noOut ? <Badge variant="danger" >{String(o.no_output_reason ?? '无输出').slice(0, 18)}</Badge> : <Badge variant="success">有输出</Badge>}</td>
+                        <td className="text-muted" style={{ maxWidth: 260, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                          {noOut ? '—' : String(o.raw_output).slice(0, 60)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -198,7 +267,12 @@ export default function EvalsPage() {
                     <td>{r.case_ids.length} × {r.model_ids.length}</td>
                     <td className="text-muted">{r.started_at ? new Date(r.started_at).toLocaleTimeString() : '—'}</td>
                     <td className="text-muted">{r.finished_at ? new Date(r.finished_at).toLocaleTimeString() : '—'}</td>
-                    <td><button className="btn sm ghost" onClick={() => view(r)}>查看</button></td>
+                    <td>
+                      <div className="cell-actions">
+                        <button className="btn sm ghost" onClick={() => view(r)}>查看</button>
+                        <button className="btn sm ghost" onClick={() => rerun(r)}>重跑</button>
+                      </div>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -209,15 +283,34 @@ export default function EvalsPage() {
 
       {detail && (
         <Drawer title={`${detail.case_title} · ${detail.model_display ?? detail.model_name}`} onClose={() => setDetail(null)}>
-          <dl className="kv">
-            <dt>延迟</dt><dd>{detail.latency_ms ?? '—'}ms</dd>
-            <dt>token</dt><dd>in {detail.token_in ?? '—'} · out {detail.token_out ?? '—'}</dd>
+          <h3 style={{ margin: '0 0 10px', fontSize: 14 }}>响应时间线</h3>
+          <div className="kv">
+            <dt>请求发出</dt><dd className="mono">{fmtTime(snap?.requestStartedAt)}（用例开跑 {fmtTime(snap?.caseStartedAt)}）</dd>
+            <dt>响应返回</dt><dd className="mono">{fmtTime(detail.created_at)}（快照 {fmtTime(snap?.finishedAt)}）</dd>
+            <dt>模型用时</dt><dd><b>{detail.latency_ms ?? '—'} ms</b></dd>
+            <dt>token 明细</dt><dd className="mono">in {detail.token_in ?? '—'} · out {detail.token_out ?? '—'} · 思考 {snap?.tokenUsage?.completionDetails?.reasoning ?? 0}{(snap?.tokenUsage?.completionDetails as { cached?: number })?.cached != null ? ` · 缓存 ${(snap?.tokenUsage?.completionDetails as { cached?: number }).cached}` : ''}</dd>
+            <dt>finishReason</dt><dd className="mono">{snap?.finishReason ?? '—'}</dd>
+            <dt>思考/上限</dt><dd className="mono">{snap?.thinking ?? '—'} · max_tokens {snap?.maxTokens ?? '—'}</dd>
             <dt>成本</dt><dd>{detail.cost_usd != null ? `$${Number(detail.cost_usd).toFixed(6)}` : '—'}</dd>
-          </dl>
+            <dt>判分</dt><dd>{snap?.grading ? `${snap.grading.pass ? '通过' : '未通过'}` : '—'}</dd>
+          </div>
+
+          {(detail.no_output_reason || (detail.raw_output == null || String(detail.raw_output).trim() === '')) && (
+            <div className="hint-bar" style={{ marginTop: 12, padding: '8px 10px', background: 'var(--danger-soft)', color: 'var(--danger)', borderRadius: 'var(--radius-sm)' }}>
+              ⚠ {detail.no_output_reason ?? '模型返回空内容'}
+            </div>
+          )}
+
           <div className="field" style={{ marginTop: 16 }}>
             <label className="field-label">原始输出</label>
-            <div className="pre-block">{detail.raw_output ?? '（无输出）'}</div>
+            <div className="pre-block">{detail.raw_output && String(detail.raw_output).trim() !== '' ? detail.raw_output : '（无输出）'}</div>
           </div>
+          {snap?.grading?.reason && (
+            <div className="field">
+              <label className="field-label">判分理由</label>
+              <div className="pre-block">{snap.grading.reason}</div>
+            </div>
+          )}
         </Drawer>
       )}
     </div>

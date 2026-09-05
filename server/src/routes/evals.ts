@@ -19,7 +19,10 @@ export async function evalRoutes(app: FastifyInstance) {
 
   // 发起评测：建 run 后后台执行（不阻塞响应），前端轮询状态
   app.post('/api/evals', async (req) => {
-    const b = req.body as { name?: string; case_ids: number[]; model_ids: number[]; judge_model_id?: number };
+    const b = req.body as {
+      name?: string; case_ids: number[]; model_ids: number[]; judge_model_id?: number;
+      config?: { timeoutSecs?: number; maxOutputTokens?: number; maxCostUsd?: number | null; concurrency?: number };
+    };
     if (!Array.isArray(b.case_ids) || !b.case_ids.length) return app.httpErrors.badRequest('case_ids 不能为空');
     if (!Array.isArray(b.model_ids) || !b.model_ids.length) return app.httpErrors.badRequest('model_ids 不能为空');
 
@@ -31,14 +34,39 @@ export async function evalRoutes(app: FastifyInstance) {
         b.case_ids,
         b.model_ids,
         b.judge_model_id ?? null,
-        { case_ids: b.case_ids, model_ids: b.model_ids },
+        { case_ids: b.case_ids, model_ids: b.model_ids, ...(b.config ?? {}) },
       ],
     );
     const run = rows[0];
     // 后台执行，失败则标记 status=failed
     void runEval(run.id).catch(async (e) => {
-      await query("UPDATE eval_runs SET status='failed' WHERE id=$1", [run.id]);
+      await query("UPDATE eval_runs SET status='failed', fail_reason=$1, finished_at=now() WHERE id=$2", [String((e as Error)?.message ?? e).slice(0, 240), run.id]);
       app.log.error(`run ${run.id} 失败: ${(e as Error).message}`);
+    });
+    return run;
+  });
+
+  // 重跑：复制该轮配置（用例×模型×裁判）发起新轮次，历史保留
+  app.post('/api/evals/:id/rerun', async (req) => {
+    const { id } = req.params as { id: string };
+    const orig = (await query('SELECT * FROM eval_runs WHERE id=$1', [id])).rows[0];
+    if (!orig) return app.httpErrors.notFound('轮次不存在');
+    if (!orig.case_ids?.length || !orig.model_ids?.length) return app.httpErrors.badRequest('原轮次缺少用例或模型配置');
+    const { rows } = await query(
+      `INSERT INTO eval_runs (name, case_ids, model_ids, judge_model_id, status, config_json)
+       VALUES ($1,$2,$3,$4,'pending',$5) RETURNING *`,
+      [
+        `${orig.name}·重跑`,
+        orig.case_ids,
+        orig.model_ids,
+        orig.judge_model_id,
+        { ...(typeof orig.config_json === 'string' ? JSON.parse(orig.config_json || '{}') : orig.config_json ?? {}), rerun_of: Number(id) },
+      ],
+    );
+    const run = rows[0];
+    void runEval(run.id).catch(async (e) => {
+      await query("UPDATE eval_runs SET status='failed', fail_reason=$1, finished_at=now() WHERE id=$2", [String((e as Error)?.message ?? e).slice(0, 240), run.id]);
+      app.log.error(`rerun ${run.id} 失败: ${(e as Error).message}`);
     });
     return run;
   });

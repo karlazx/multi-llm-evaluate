@@ -38,6 +38,8 @@ export interface EvalRun {
   status: string;
   started_at: string | null;
   finished_at: string | null;
+  fail_reason?: string | null;
+  config_json?: Record<string, unknown> | string | null;
 }
 
 export interface Report {
@@ -86,6 +88,7 @@ export interface Calibration {
   agreement: number | null;
   comparable: number;
   total_votes: number;
+  abstain: number;
   ai_avg: Array<{ id: number; name: string; ai_score: number }>;
   elo: EloRow[];
 }
@@ -96,13 +99,35 @@ export interface RunOutput {
   case_id: number;
   model_id: number;
   raw_output: string | null;
+  no_output_reason: string | null;
   token_in: number | null;
   token_out: number | null;
   latency_ms: number | null;
   cost_usd: number | null;
+  created_at: string;
   case_title: string;
   model_display: string | null;
   model_name: string;
+  snapshot_json?: {
+    thinking?: string;
+    maxTokens?: number;
+    protocol?: string;
+    requestStartedAt?: string;
+    caseStartedAt?: string;
+    finishedAt?: string;
+    finishReason?: string | null;
+    tokenUsage?: { prompt?: number; completion?: number; total?: number; completionDetails?: { reasoning?: number } } | null;
+    error?: string | null;
+    noOutputReason?: string | null;
+    grading?: { pass?: boolean; reason?: string } | null;
+  } | null;
+}
+
+export interface RunConfigInput {
+  timeoutSecs?: number;
+  maxOutputTokens?: number;
+  maxCostUsd?: number | null;
+  concurrency?: number;
 }
 
 async function req<T>(url: string, init?: RequestInit): Promise<T> {
@@ -123,7 +148,7 @@ async function req<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const api = {
   cases: {
-    list: () => req<CaseRow[]>('/api/cases'),
+    list: (status?: string) => req<CaseRow[]>(`/api/cases${status ? `?status=${status}` : ''}`),
     create: (b: Partial<CaseRow>) => req<CaseRow>('/api/cases', { method: 'POST', body: JSON.stringify(b) }),
     import: (cases: Array<Record<string, unknown>>) =>
       req<{ inserted: number; failed: number; errors: Array<{ index: number; reason: string }> }>('/api/cases/import', { method: 'POST', body: JSON.stringify(cases) }),
@@ -131,7 +156,7 @@ export const api = {
     archive: (id: number) => req<{ ok: boolean }>(`/api/cases/${id}`, { method: 'DELETE' }),
   },
   models: {
-    list: () => req<ModelRow[]>('/api/models'),
+    list: (status?: string) => req<ModelRow[]>(`/api/models${status ? `?status=${status}` : ''}`),
     create: (b: Record<string, unknown>) => req<ModelRow>('/api/models', { method: 'POST', body: JSON.stringify(b) }),
     update: (id: number, b: Record<string, unknown>) => req<ModelRow>(`/api/models/${id}`, { method: 'PUT', body: JSON.stringify(b) }),
     archive: (id: number) => req<{ ok: boolean }>(`/api/models/${id}`, { method: 'DELETE' }),
@@ -140,7 +165,8 @@ export const api = {
   evals: {
     list: () => req<EvalRun[]>('/api/evals'),
     get: (id: number) => req<EvalRun>(`/api/evals/${id}`),
-    create: (b: { name?: string; case_ids: number[]; model_ids: number[] }) => req<EvalRun>('/api/evals', { method: 'POST', body: JSON.stringify(b) }),
+    create: (b: { name?: string; case_ids: number[]; model_ids: number[]; config?: RunConfigInput }) => req<EvalRun>('/api/evals', { method: 'POST', body: JSON.stringify(b) }),
+    rerun: (id: number) => req<EvalRun>(`/api/evals/${id}/rerun`, { method: 'POST' }),
     outputs: (id: number) => req<RunOutput[]>(`/api/evals/${id}/outputs`),
     report: (id: number) => req<Report>(`/api/evals/${id}/report`),
     exportMd: async (id: number) => (await fetch(`/api/evals/${id}/export`)).text(),
@@ -152,8 +178,10 @@ export const api = {
   blind: {
     outputs: (runId: number) =>
       req<{ outputs: BlindOutput[]; models: Array<{ id: number; name: string }> }>(`/api/blind/${runId}/outputs`),
-    vote: (b: { run_id: number; case_id: number; winner_model_id: number; loser_model_id: number }) =>
+    // winner_model_id = null 表示弃权（都不合格）
+    vote: (b: { run_id: number; case_id: number; winner_model_id: number | null; loser_model_id?: number | null }) =>
       req<{ id: number }>('/api/blind/votes', { method: 'POST', body: JSON.stringify(b) }),
+    clearVotes: (runId: number) => req<{ ok: boolean; deleted: number }>(`/api/blind/${runId}/votes`, { method: 'DELETE' }),
     elo: (runId: number) => req<EloRow[]>(`/api/blind/${runId}/elo`),
     calibration: (runId: number) => req<Calibration>(`/api/blind/${runId}/calibration`),
   },
