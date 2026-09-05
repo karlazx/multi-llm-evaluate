@@ -98,9 +98,9 @@ export async function runEval(runId: number): Promise<void> {
     while (cursor < remaining.length) {
       if (stoppedByCost) return;
       const c = remaining[cursor++];
-      // 单用例整体超时；超时后迟到的结果只落快照不再写库（timedOut 旗标防重复行）
+      // 单用例整体超时兜底（promptfoo 原生 timeoutMs 先行标记失败，race 仅防进程挂死，多留 15s 余量）
       const state = { timedOut: false };
-      const timeout = new Promise<'timeout'>((res) => setTimeout(() => { state.timedOut = true; res('timeout'); }, cfg.timeoutSecs! * 1000));
+      const timeout = new Promise<'timeout'>((res) => setTimeout(() => { state.timedOut = true; res('timeout'); }, cfg.timeoutSecs! * 1000 + 15000));
       const job = runOneCase(runId, c, models, judgeProvider, snapDir, cfg, state).then((cost) => ({ kind: 'ok' as const, cost }));
       const outcome = await Promise.race([job, timeout]).catch(async (e) => {
         for (const m of models) {
@@ -156,11 +156,15 @@ async function runOneCase(
   const assertions = buildAssertions(c, judgeProvider);
   const startedAt = Date.now();
 
-  const r = await evaluate({
-    providers: providerSpecs.map((p) => p.spec),
-    prompts: [{ label: `case:${c.id}`, raw: c.prompt }],
-    defaultTest: { assert: assertions },
-  });
+  const r = await evaluate(
+    {
+      providers: providerSpecs.map((p) => p.spec),
+      prompts: [{ label: `case:${c.id}`, raw: c.prompt }],
+      defaultTest: { assert: assertions },
+    },
+    // 评测必须真实调用：关闭响应缓存（否则重跑会回放历史延迟/假成本）；超时用原生 timeoutMs
+    { cache: false, timeoutMs: cfg.timeoutSecs! * 1000 },
+  );
 
   let caseCost = 0;
   for (const res of r.results as any[]) {

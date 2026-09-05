@@ -46,10 +46,13 @@ async function judgeOnce(
   judgeSpec: { id: string; config: Record<string, unknown> },
   promptText: string,
 ): Promise<{ winner: 'A' | 'B' | 'tie'; reason: string }> {
-  const r = await evaluate({
-    providers: [judgeSpec],
-    prompts: [{ label: 'pairwise', raw: promptText }],
-  });
+  const r = await evaluate(
+    {
+      providers: [judgeSpec],
+      prompts: [{ label: 'pairwise', raw: promptText }],
+    },
+    { cache: false },
+  );
   const res = (r.results as Array<{ response?: { output?: string } }>)[0];
   return parseJudgeReply(String(res?.response?.output ?? ''));
 }

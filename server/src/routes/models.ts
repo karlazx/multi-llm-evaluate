@@ -103,10 +103,13 @@ export async function modelRoutes(app: FastifyInstance) {
     const model = rows[0] as Record<string, unknown> & { api_key_enc: string | null };
     const provider = buildProvider(model as never);
     try {
-      const r = await evaluate({
-        providers: [provider],
-        prompts: [{ label: 'conn-test', raw: '连接测试：只回复两个字 OK' }],
-      });
+      const r = await evaluate(
+        {
+          providers: [provider],
+          prompts: [{ label: 'conn-test', raw: '连接测试：只回复两个字 OK' }],
+        },
+        { cache: false },
+      );
       const res = (r.results as any[])[0];
       if (res.error) return { ok: false, message: String(res.error), latencyMs: res.latencyMs ?? null };
       return {
