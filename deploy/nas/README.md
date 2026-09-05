@@ -18,7 +18,7 @@ cd /docker/mle && docker compose pull app && docker compose up -d app
 部署完成后首次需初始化数据：
 
 ```bash
-docker exec mle-app npx tsx server/src/seed.ts   # 录入 6 个种子用例
+docker exec mle-app node server/dist/seed.js   # 录入 6 个种子用例
 # 模型在「模型接入」页手动录入（参考 docs/assets/模型单价清单.md 的单价）
 ```
 

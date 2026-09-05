@@ -1,6 +1,5 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import Fastify from 'fastify';
 import cors from '@fastify/cors';
 import sensible from '@fastify/sensible';
@@ -30,9 +29,8 @@ async function main() {
 
   app.get('/api/health', async () => ({ ok: true, ts: Date.now() }));
 
-  // 生产环境：托管前端构建产物 web/dist
-  const __dirname = path.dirname(fileURLToPath(import.meta.url));
-  const distDir = path.resolve(__dirname, '../../web/dist');
+  // 生产环境：托管前端构建产物 web/dist（锚定工作目录=仓库根）
+  const distDir = path.resolve(process.cwd(), 'web/dist');
   if (existsSync(distDir)) {
     await app.register(fastifyStatic, { root: distDir });
   }

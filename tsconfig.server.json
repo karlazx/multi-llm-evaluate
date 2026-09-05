@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "moduleResolution": "Bundler",
+    "rootDir": "server/src",
+    "outDir": "server/dist",
+    "sourceMap": false
+  },
+  "include": ["server/src"]
+}
